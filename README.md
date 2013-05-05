@@ -6,13 +6,17 @@ KahnProcessNetworks is set of OCaml's implementations for Kahn process networks,
 Quick start
 ---------------------
 
-- Clone the repo: `git clone git://github.com/KahnProcessNetworks/KahnProcessNetworks.git`
-- Change the directory: `cd KahnProcessNetworks`
+- Clone the repo:
+	`git clone git://github.com/KahnProcessNetworks/KahnProcessNetworks.git`
+- Change the directory:
+	`cd KahnProcessNetworks`
 - Compile the program:
 	- `make thread`
 	- `make pipe`
 	- `make network`
 	- `make sequential`
+- Execute the program:
+	`./a.out`
 
 Authors
 ---------------------
