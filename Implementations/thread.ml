@@ -5,9 +5,10 @@ open Unix
 open Kahn
 
 
-module S : S = struct
+module S : S =
+struct
 	type 'a process = (unit -> 'a)
-	type 'a channel = { q: 'a Queue.t ; m: Mutex.t; }
+	type 'a channel = { q: 'a Queue.t; m: Mutex.t; }
 	type 'a in_port = 'a channel
 	type 'a out_port = 'a channel
 	

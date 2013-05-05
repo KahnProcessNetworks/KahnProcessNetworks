@@ -1,7 +1,7 @@
 KahnProcessNetworks
 ===================
 
-KahnProcessNetworks is set of OCaml's implementations for Kahn process networks, developped by Axel Davy and Baptiste Lefebvre. Processes communicate through threads, pipes or the network depending of the implementation. A last implementation simulate paralellism sequentially.
+KahnProcessNetworks is a set of OCaml's implementations for Kahn process networks, developped by Axel Davy and Baptiste Lefebvre. Processes communicate through threads, pipes or the network depending of the implementation. A last implementation simulate paralellism sequentially.
 
 Quick start
 ---------------------

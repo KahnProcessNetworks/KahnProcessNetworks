@@ -4,9 +4,9 @@ open Unix
 open Kahn
 
 
-module S : S = struct
+module S : S =
+struct
 	type 'a process = unit
-	type 'a channel = unit
 	type 'a in_port = unit
 	type 'a out_port = unit
 	
