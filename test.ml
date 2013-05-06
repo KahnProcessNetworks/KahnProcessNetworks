@@ -16,21 +16,18 @@ struct
 	open Lib
 	
 	let integers (qo : int K.out_port) : unit K.process =
-		Format.printf "> integers@.";
 		let rec loop n =
 			(K.put n qo) >>= (fun () -> loop (n + 1))
 		in
 		loop 2
 	
 	let output (qi : int K.in_port) : unit K.process =
-		Format.printf "%d > output@." (Unix.getpid ());
 		let rec loop () =
 			(K.get qi) >>= (fun v -> Format.printf "%d@." v; loop ())
 		in
 		loop ()
 	
 	let main () : unit K.process =
-		Format.printf "%d > main@." (Unix.getpid ());
 		(delay K.new_channel ()) >>= (fun (q_in, q_out) -> K.doco [ integers q_out ; output q_in ; ])
 end
  
