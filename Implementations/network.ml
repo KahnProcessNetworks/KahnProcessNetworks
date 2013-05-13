@@ -14,7 +14,7 @@ open Kahn
 
 (* Constant *******************************************************************)
 
-let trace_enable = false
+let trace_enable = true
 
 
 (* auxiliary functions *)
@@ -35,7 +35,7 @@ let trace_error f x =
     f x
   with
     Unix_error (error, function_name, arguments) ->
-      trace (function_name ^ " " ^ (error_message error) ^ " " ^ arguments);
+      trace (function_name ^ ": " ^ (error_message error) ^ ", " ^ arguments);
       raise Exit
 
 let make_addr port = 
@@ -106,14 +106,14 @@ struct
         match ((Marshal.from_channel in_ch): 'a request) with
         | PUT(v) ->
         lv := !lv @ [v];
-        trace (String.concat " server_channel " [string_of_int port;" has put a new value"]);
+        trace ("server_channel " ^ (string_of_int port) ^ " has put a new value");
         | GET ->
         match !lv with
           | [] ->
-          trace (String.concat " server_channel " [string_of_int port;" get is unsuccessful"]);
+          trace ("server_channel " ^ (string_of_int port) ^ " has put a new value");
           respond out_ch FAILURE
           | v::q ->
-          trace (String.concat " server_channel " [string_of_int port;" get is successful"]);
+          trace ("server_channel " ^ (string_of_int port) ^ " has put a new value");
           lv := q;
           respond out_ch (SUCCESS v)
     in
