@@ -11,10 +11,10 @@ Fatal error: exception Sys_error("Connection reset by peer")
 open Unix
 open Kahn
 
+
 (* Constant *******************************************************************)
 
-let trace_enable = true
-
+let trace_enable = false
 
 
 (* auxiliary functions *)
@@ -45,8 +45,8 @@ let run_server service addr =
   bind s addr;
   listen s 100;
   while true do
-  let(fd_client, addr_client) = accept s in
-  service fd_client addr_client;
+    let (fd_client, addr_client) = accept s in
+    service fd_client addr_client;
   done
   
   
@@ -88,22 +88,31 @@ struct
 		  Marshal.to_channel out_ch answ [ Marshal.Closures ];flush out_ch (* flushing is important *)
 		in
 		let service fd addr_client =
-		    let out_ch = out_channel_of_descr fd and in_ch = in_channel_of_descr fd in
-		    match ((Marshal.from_channel in_ch): 'a request ) with
-		      |PUT(v) -> lv := !lv@([v]);trace (String.concat " server_channel " [string_of_int port;" has put a new value"]);
-		      |GET    -> ( match !lv with
-				    |[] -> trace (String.concat " server_channel " [string_of_int port;" get is unsuccessful"]);respond out_ch FAILURE
-				    |v::q -> trace (String.concat " server_channel " [string_of_int port;" get is successful"]);respond out_ch (SUCCESS (v))
-				    )
+		    let out_ch = out_channel_of_descr fd in
+			let in_ch = in_channel_of_descr fd in
+		    match ((Marshal.from_channel in_ch): 'a request) with
+		    | PUT(v) ->
+				lv := !lv @ [v];
+				trace (String.concat " server_channel " [string_of_int port;" has put a new value"]);
+		    | GET ->
+				match !lv with
+			    | [] ->
+					trace (String.concat " server_channel " [string_of_int port;" get is unsuccessful"]);
+					respond out_ch FAILURE
+			    | v::q ->
+					trace (String.concat " server_channel " [string_of_int port;" get is successful"]);
+					lv := q;
+					respond out_ch (SUCCESS v)
 		in
+		trace "server_channel";
 		run_server (service) (make_addr port)
 	
 	let new_channel () =
 		trace "new_channel";
 		port_max := !port_max + 1;
-		let c =make_addr !port_max in
+		let c = make_addr !port_max in
 		create_servers [(fun () -> server_channel !port_max)];
-		c,c
+		(c, c)
 		
 	
 	

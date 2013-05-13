@@ -1,3 +1,4 @@
+*.out
 *.annot
 *.cmo
 *.cma
@@ -7,3 +8,5 @@
 *.cmx
 *.cmxs
 *.cmxa
+
+implementation.ml
