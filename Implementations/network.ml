@@ -110,10 +110,10 @@ struct
         | GET ->
         match !lv with
           | [] ->
-          trace ("server_channel " ^ (string_of_int port) ^ " has put a new value");
+          trace ("server_channel " ^ (string_of_int port) ^ " get unsuccessful");
           respond out_ch FAILURE
           | v::q ->
-          trace ("server_channel " ^ (string_of_int port) ^ " has put a new value");
+          trace ("server_channel " ^ (string_of_int port) ^ " get successful");
           lv := q;
           respond out_ch (SUCCESS v)
     in
