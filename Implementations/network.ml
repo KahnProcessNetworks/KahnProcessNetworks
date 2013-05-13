@@ -37,16 +37,21 @@ let make_addr port =
 let run_client f addr =
   let s = socket PF_INET SOCK_STREAM 0 in
   connect s addr;
-  f s
+  let answ = f s in
+  Unix.close s;
+  answ
   
 
 let run_server service addr =
   let s = socket PF_INET SOCK_STREAM 0 in
+  setsockopt s SO_REUSEADDR true;
   bind s addr;
   listen s 100;
+  trace "server ready";
   while true do
     let (fd_client, addr_client) = accept s in
     service fd_client addr_client;
+    Unix.close fd_client;
   done
   
   
@@ -120,7 +125,7 @@ struct
     let f s = 
       let out_ch = out_channel_of_descr s in
       Marshal.to_channel out_ch (PUT(v)) [ Marshal.Closures ];
-      close_out out_ch
+      flush out_ch;
     in
     trace "put";
     run_client f c (* we sent a put request to the server representing the channel *)
@@ -131,15 +136,14 @@ struct
       let out_ch = out_channel_of_descr s and in_ch = in_channel_of_descr s in 
         Marshal.to_channel out_ch (GET) [ Marshal.Closures ]; 
         flush out_ch; (*send a GET request *)
-        let answ = ((Marshal.from_channel in_ch) : 'a answer) in (*get the answer *)
+        ((Marshal.from_channel in_ch) : 'a answer) (*get the answer *)
+    in
+    let answ = run_client (send_request_and_receive) c in 
         match answ with
           |SUCCESS v -> v
           |FAILURE -> loop_until_success ()
-      in
-      run_client (send_request_and_receive) c
     in
     trace "get ";
-    
     loop_until_success ()
     
   let rec doco l () =
