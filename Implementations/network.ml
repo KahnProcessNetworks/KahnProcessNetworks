@@ -30,6 +30,14 @@ let trace =
       end
     else ()
 
+let trace_error f x =
+  try
+    f x
+  with
+    Unix_error (error, function_name, arguments) ->
+      trace (function_name ^ " " ^ (error_message error) ^ " " ^ arguments);
+      raise Exit
+
 let make_addr port = 
   let ip_addr = inet_addr_loopback in
     ADDR_INET (ip_addr,port)
@@ -81,10 +89,10 @@ struct
       match fork () with
       |  0 ->
         trace "fork (child)";
-        hd ()
+        trace_error hd ()
       |  pid ->
         trace "fork (father)";
-        create_servers tl
+        trace_error create_servers tl
   
   let server_channel port = (* a server that turns everytime to receive requests and send answers if needed *)
   (*represents the channel: we can send put and get commands*)
@@ -154,10 +162,10 @@ struct
       match fork () with
       |  0 ->
         trace "fork (child)";
-        hd ()
+        trace_error hd ()
       |  pid ->
         trace "fork (father)";
-        doco tl ();
+        trace_error (doco tl) ();
         let _ = wait () in
         ()
   
