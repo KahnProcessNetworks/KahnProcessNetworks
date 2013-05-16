@@ -44,6 +44,7 @@ let make_addr port =
     
 let run_client f addr =
   let s = socket PF_INET SOCK_STREAM 0 in
+  setsockopt_optint s SO_LINGER None;
   connect s addr;
   let answ = f s in
   Unix.close s;
@@ -53,6 +54,7 @@ let run_client f addr =
 let run_server service addr =
   let s = socket PF_INET SOCK_STREAM 0 in
   setsockopt s SO_REUSEADDR true;
+  setsockopt_optint s SO_LINGER (Some (0));
   bind s addr;
   listen s 100;
   trace "server ready";
@@ -106,14 +108,14 @@ struct
         match ((Marshal.from_channel in_ch): 'a request) with
         | PUT(v) ->
         lv := !lv @ [v];
-        trace ("server_channel " ^ (string_of_int port) ^ " has put a new value");
+        trace ("server_channel " ^ (string_of_int port) ^ " has put a new value:" ^(string_of_int v));
         | GET ->
         match !lv with
           | [] ->
           trace ("server_channel " ^ (string_of_int port) ^ " get unsuccessful");
           respond out_ch FAILURE
           | v::q ->
-          trace ("server_channel " ^ (string_of_int port) ^ " get successful");
+          trace ("server_channel " ^ (string_of_int port) ^ " get successful:"^(string_of_int v));
           lv := q;
           respond out_ch (SUCCESS v)
     in
@@ -147,6 +149,7 @@ struct
         ((Marshal.from_channel in_ch) : 'a answer) (*get the answer *)
     in
     let answ = run_client (send_request_and_receive) c in 
+        (*for i =0 to 100000 do let () = () in ();done;*)
         match answ with
           |SUCCESS v -> v
           |FAILURE -> loop_until_success ()
