@@ -14,7 +14,7 @@ open Kahn
 
 (* Constant *******************************************************************)
 
-let trace_enable = true
+let trace_enable = false
 
 
 (* auxiliary functions *)
