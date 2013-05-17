@@ -49,6 +49,16 @@ struct
     let v = ((Marshal.from_channel c) : 'a) in
     f v
   
+(* idée d'amélioration: 
+actuellement les fonctions données à put et get sont les fonctions fill données par bind et run.
+doco pourrait appeller get et put avec une autre fonction, qui en cas de succès de get/put appelle la fonction de départ (fill) avec le bon argument
+et si get échoue, ne pas appeler la fonction de départ, mais réappeler get plus tard.
+
+TODO pour cette méthode: remplacer l'implémentation des channel par c une fonction qui rempli/dépile une liste, comme ça on peut tester si c'est vide au lieu de bloquer
+Je n'ai pas le temps là, peut-être plus tard.
+
+*)  
+  
   let rec doco l = (* doco très imparfait *)
     trace "doco";
     match l with
