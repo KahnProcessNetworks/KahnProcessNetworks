@@ -1,3 +1,5 @@
+# OCaml
+
 *.out
 *.annot
 *.cmo
@@ -10,3 +12,9 @@
 *.cmxa
 
 implementation.ml
+
+
+# LaTeX
+
+*.aux
+*.log

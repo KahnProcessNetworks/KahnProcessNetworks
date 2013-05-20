@@ -1,0 +1,47 @@
+\documentclass[a4paper]{article}
+
+\usepackage[french]{babel}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+
+
+\begin{document}
+
+	\title{\textbf{Systèmes et réseaux \\ Projet Réseaux de Kahn}}
+	\author{Axel Davy \\ \'Ecole normale supérieure \and Baptiste Lefebvre \\ \'Ecole normale supérieure}
+	\date{26 mai 2013}
+	\maketitle
+
+
+\section{Choix techniques}
+Aucun.
+
+\section{Difficultés rencontrées}
+Aucune.
+
+\section{\'Eléments non réalisés}
+Aucun.
+
+\section{Installation}
+
+Une fois l'archive \texttt{davy-lefebvre.tgz} récupérée et les fichiers extraits placez-vous dans le répertoire \texttt{davy-lefebvre}. Dans ce répertoire la commande :
+\begin{itemize}
+	\item \texttt{make} ou \texttt{make thread} : compile notre programme avec l'implémentation naïve qui utilise la bibliothèque de threads d'OCaml
+	\item \texttt{make pipe} : compile notre programme avec l'implémentation reposant sur l'utilisation de processus Unix communiquant par des tubes
+	\item \texttt{make network} : compile notre programme avec l'implémentation s'exécutant à travers le réseau
+	\item \texttt{make sequential} : compile notre programme avec l'implémentation séquentielle où le parallélisme est simulé par notre programme
+\end{itemize}
+Pour la désinstallation la commande :
+\begin{itemize}
+	\item \texttt{make clean} : efface tous les fichier qu'une des commandes précédentes a pu engendrer et ne laisse dans le répertoire que les fichiers sources
+\end{itemize}
+Si vous n'avez pas réussi à récupérer l'archive vous pouvez également récupérer le code source à l'aide de la commande
+\begin{itemize}
+	\item \texttt{git clone https://github.com/KahnProcessNetworks/KahnProcessNetworks}
+\end{itemize}
+en vérifiant à bien avoir installé au préalable le système de contrôle de version \texttt{git}.
+ 
+
+
+\end{document}
+
