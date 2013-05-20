@@ -6,7 +6,7 @@ open List
 exception Stop 
 (* Constant *******************************************************************)
 
-let trace_enable = true
+let trace_enable = false
 
 
 (* Auxilliar function *********************************************************)
@@ -21,7 +21,7 @@ let trace =
       Format.printf "// l: %d  pid: %d  f: %s@." !i (getpid ()) s
       end
     else ()
-
+    
 
 (* Main ***********************************************************************)
 
@@ -56,26 +56,13 @@ struct
     with
     Queue.Empty ->
       FAILURE
-      
-      (*
-      
-      * idée d'amélioration: 
-actuellement les fonctions données à put et get sont les fonctions fill données par bind et run.
-doco pourrait appeller get et put avec une autre fonction, qui en cas de succès de get/put appelle la fonction de départ (fill) avec le bon argument
-et si get échoue, ne pas appeler la fonction de départ, mais réappeler get plus tard.
-
-TODO pour cette méthode: remplacer l'implémentation des channel par c une fonction qui rempli/dépile une liste, comme ça on peut tester si c'est vide au lieu de bloquer
-Je n'ai pas le temps là, peut-être plus tard.
-
-*)  
-
 
 
   let rec doco l = (* doco très imparfait *)
     trace "doco";
     match l with
     | [] -> failwith "doco on an empty list"
-    | [f] -> trace "fin doco";f
+    | [f] -> f
     | a::q -> 
                  (fun s -> 
 		       let l = ref([]) in
@@ -93,7 +80,7 @@ Je n'ai pas le temps là, peut-être plus tard.
     SUCCESS
   
   
-  let bind (e:'a process) e'=
+  let bind (e:'a process) (e':('a -> 'b process)) =
     trace "bind";
     let rec calc_e = ref (fun () ->
 		let l = ref([])in
@@ -105,12 +92,14 @@ Je n'ai pas le temps là, peut-être plus tard.
 		in
 		loop_until_success(); 
 		match (hd(!l)) with
-		|REPONSE (v) -> calc_e:=(fun () -> v);raise Stop;v) in
+		|REPONSE (v) -> calc_e:=(fun () -> e' v);raise Stop;e' v)  in
     (
       fun f -> 
       try 
-        let v = ((!calc_e)()) in 
-        e' v f
+        let p = ((!calc_e)()) in 
+        let k = p f in
+        calc_e:=(fun () -> p);
+        k
       with Stop -> FAILURE )
      
   
