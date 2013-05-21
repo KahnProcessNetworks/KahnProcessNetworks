@@ -15,13 +15,16 @@ KahnProcessNetworks is a set of OCaml's implementations for Kahn process network
 	`./a.out`
 
 ## Report
+
 ### Technical choice
 We chose to use the following OCaml modules:
 - `Marshal`
 - `Thread`
 - `Unix`
+
 ### Difficulties
 We don't really know what is the appropriate implementation of the Kahn process networks with communication through the network. For instance we have aligned sockets with pipes and servers with processes but we are unable to establish server in a different location than the host machine. RPC could be the way to do so.
+
 ### Unrealized items
 We have made the implementation without taking care about `Unix` errors. For example interruptions with signals are not handle.
 
