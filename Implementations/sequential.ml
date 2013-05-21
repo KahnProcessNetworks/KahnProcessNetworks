@@ -1,27 +1,11 @@
 (* Implementation simulating parallelism sequentially. ************************)
 
-open Unix
 open Kahn
+open Miscellaneous
+open Unix
 open List
-exception Stop 
-(* Constant *******************************************************************)
+exception Stop
 
-let trace_enable = false
-
-
-(* Auxilliar function *********************************************************)
-
-let trace =
-  let i = ref 0 in
-  fun s ->
-    if (trace_enable)
-    then
-      begin
-      incr i;
-      Format.printf "// l: %d  pid: %d  f: %s@." !i (getpid ()) s
-      end
-    else ()
-    
 
 (* Main ***********************************************************************)
 

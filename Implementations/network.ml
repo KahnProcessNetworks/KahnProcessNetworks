@@ -1,189 +1,126 @@
 (* Implementation with processes communicating through the network. ***********)
 
+open Kahn
+open Miscellaneous
+open Unix
 
-(* TODO: handle the errors than can (and will) occurs:
-Example:
-Fatal error: exception Unix.Unix_error(15, "accept", "")
-Fatal error: exception Unix.Unix_error(63, "connect", "")
-Fatal error: exception Sys_error("Connection reset by peer")
+
+(* Auxilliar functions ********************************************************)
+
+let get_addr () =
+    trace "get_addr";
+    let host_name = gethostname () in
+    let host_entry = gethostbyname host_name in
+    host_entry.h_addr_list.(0)
+
+let make_sockaddr port =
+    trace "make_sockaddr";
+    let addr = get_addr () in
+    ADDR_INET (addr, port)
+
+(*
+Par défaut, on utilise l'adresse internet de la machine hôte uniquement. On
+pourrait imaginer un fichier de configuration contenant les adresses disponibles
+pour les sockets mais il faudrait savoir créer et utiliser des RPC en OCaml pour
+établir à distance les serveurs du réseau. 
+Pour mémoire :
+type sockaddr =
+    | ADDR_UNIX of string
+    | ADDR_INET of inet_addr * int
 *)
 
-open Unix
-open Kahn
 
-
-(* Constant *******************************************************************)
-
-let trace_enable = false
-
-
-(* auxiliary functions *)
-
-let trace =
-  let i = ref 0 in
-  fun s ->
-    if (trace_enable)
-    then
-      begin
-      incr i;
-      Format.printf "// l: %d  pid: %d  f: %s@.%!" !i (getpid ()) s
-      end
-    else ()
-
-let trace_error f x =
-  try
-    f x
-  with
-    Unix_error (error, function_name, arguments) ->
-      trace (function_name ^ ": " ^ (error_message error) ^ ", " ^ arguments);
-      raise Exit
-
-let make_addr port = 
-  let ip_addr = inet_addr_loopback in
-    ADDR_INET (ip_addr,port)
-    
-let run_client f addr =
-  let s = socket PF_INET SOCK_STREAM 0 in
-  setsockopt_optint s SO_LINGER None;
-  connect s addr;
-  let answ = f s in
-  Unix.close s;
-  answ
-  
-
-let run_server service addr =
-  let s = socket PF_INET SOCK_STREAM 0 in
-  setsockopt s SO_REUSEADDR true;
-  setsockopt_optint s SO_LINGER (Some (0));
-  bind s addr;
-  listen s 100;
-  trace "server ready";
-  while true do
-    let (fd_client, addr_client) = accept s in
-    service fd_client addr_client;
-    Unix.close fd_client;
-  done
-  
-  
-
-(* module *)
-
-
+(* Module *********************************************************************)
 
 module S : S =
 struct
-  type 'a process = unit -> 'a
-  type 'a in_port = Unix.sockaddr
-  type 'a out_port = Unix.sockaddr
-  
-  type 'a request = PUT of 'a | GET
-  type 'a answer = SUCCESS of 'a | FAILURE
-  
-  let port_min = ref(10000)
-  let port_max = ref(9999) (* last port given *)
-  
-  
-  let rec create_servers l =
-    trace "create servers for channels";
-    match l with
-    | [] -> ()
-    | hd :: tl ->
-      match fork () with
-      |  0 ->
-        trace "fork (child)";
-        trace_error hd ()
-      |  pid ->
-        trace "fork (father)";
-        trace_error create_servers tl
-  
-  let server_channel port = (* a server that turns everytime to receive requests and send answers if needed *)
-  (*represents the channel: we can send put and get commands*)
-    let lv = ((ref []) :'a list ref) in
-    let respond out_ch answ = (* sens an answer *)
-      Marshal.to_channel out_ch answ [ Marshal.Closures ];flush out_ch (* flushing is important *)
-    in
-    let service fd addr_client =
-        let out_ch = out_channel_of_descr fd in
-      let in_ch = in_channel_of_descr fd in
-        match ((Marshal.from_channel in_ch): 'a request) with
-        | PUT(v) ->
-        lv := !lv @ [v];
-        trace ("server_channel " ^ (string_of_int port) ^ " has put a new value:" ^(string_of_int v));
-        | GET ->
-        match !lv with
-          | [] ->
-          trace ("server_channel " ^ (string_of_int port) ^ " get unsuccessful");
-          respond out_ch FAILURE
-          | v::q ->
-          trace ("server_channel " ^ (string_of_int port) ^ " get successful:"^(string_of_int v));
-          lv := q;
-          respond out_ch (SUCCESS v)
-    in
-    trace "server_channel";
-    run_server (service) (make_addr port)
-  
-  let new_channel () =
-    trace "new_channel";
-    port_max := !port_max + 1;
-    let c = make_addr !port_max in
-    create_servers [(fun () -> server_channel !port_max)];
-    (c, c)
+    type 'a process = unit -> 'a
+    type 'a port =
+    {
+        addr: sockaddr;
+        mutable channel: 'a;
+        mutable is_not_active: bool
+    }
+    type 'a in_port = in_channel port
+    type 'a out_port = out_channel port
     
-  
-  
-  let put (v : 'a) c () =
-    let f s = 
-      let out_ch = out_channel_of_descr s in
-      Marshal.to_channel out_ch (PUT(v)) [ Marshal.Closures ];
-      flush out_ch;
-    in
-    trace "put";
-    run_client f c (* we sent a put request to the server representing the channel *)
-  
-  let rec get c ()=
-    let rec loop_until_success () =
-    let send_request_and_receive s = 
-      let out_ch = out_channel_of_descr s and in_ch = in_channel_of_descr s in 
-        Marshal.to_channel out_ch (GET) [ Marshal.Closures ]; 
-        flush out_ch; (*send a GET request *)
-        ((Marshal.from_channel in_ch) : 'a answer) (*get the answer *)
-    in
-    let answ = run_client (send_request_and_receive) c in 
-        (*for i =0 to 100000 do let () = () in ();done;*)
-        match answ with
-          |SUCCESS v -> v
-          |FAILURE -> loop_until_success ()
-    in
-    trace "get ";
-    loop_until_success ()
+    let new_port addr channel is_not_active =
+        trace "new_port";
+        {
+            addr = addr;
+            channel = channel;
+            is_not_active = is_not_active;
+        }
     
-  let rec doco l () =
-    trace "doco";
-    match l with
-    | [] -> ()
-    | hd :: tl ->
-      match fork () with
-      |  0 ->
-        trace "fork (child)";
-        trace_error hd ()
-      |  pid ->
-        trace "fork (father)";
-        trace_error (doco tl) ();
-        let _ = wait () in
-        ()
-  
-  let return v =
-    trace "return";
-    fun () -> v
-  
-  let bind e e' () =
-    trace "bind";
-    let v = e () in
-    e' v ()
+    let new_channel =
+        let port = ref 1399 in
+        fun () ->
+            trace "new_channel";
+            incr port;
+            let sockaddr = make_sockaddr !port in
+            let in_channel = in_channel_of_descr stdin in
+            let in_port = new_port sockaddr in_channel true in
+            let out_channel = out_channel_of_descr stdout in
+            let out_port = new_port sockaddr out_channel true in
+            (in_port, out_port)
     
-  
-  let run e =
-    trace "run";
-    e ()
-  
+    let put (v : 'a) p () =
+        trace "put";
+        if (p.is_not_active)
+        then
+            begin
+            let sockdomain = domain_of_sockaddr p.addr in
+            let socktype = SOCK_STREAM in
+            let sock = socket sockdomain socktype 0 in
+            connect sock p.addr;
+            let out_channel = out_channel_of_descr sock in
+            p.channel <- out_channel;
+            p.is_not_active <- false;
+            end;
+        Marshal.to_channel p.channel (v : 'a) [ Marshal.Closures ]
+    
+    let rec get p ()=
+        trace "get ";
+        if (p.is_not_active)
+        then
+            begin
+            let sockdomain = domain_of_sockaddr p.addr in
+            let socktype = SOCK_STREAM in
+            let sock = socket sockdomain socktype 0 in
+            bind sock p.addr;
+            listen sock 10;
+            let (file_descr, _) = accept sock in
+            let in_channel = in_channel_of_descr file_descr in
+            p.channel <- in_channel;
+            p.is_not_active <- false;
+            end;
+        ((Marshal.from_channel p.channel) : 'a)
+    
+    let rec doco l () =
+        trace "doco";
+        match l with
+        | [] -> ()
+        | hd :: tl ->
+            match fork () with
+            | 0 ->
+                trace "fork (child)";
+                hd ()
+            | pid ->
+                trace "fork (father)";
+                doco tl ();
+                let _ = waitpid [] pid in
+                ()
+    
+    let return v =
+        trace "return";
+        fun () -> v
+    
+    let bind e e' () =
+        trace "bind";
+        let v = e () in
+        e' v ()
+    
+    let run e =
+        trace "run";
+        e ()    
 end
