@@ -9,8 +9,6 @@
 *.cmx
 *.cmxs
 *.cmxa
-implementation.ml
-miscellaneous.ml
 
 # LaTeX
 *.aux

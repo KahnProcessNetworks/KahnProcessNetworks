@@ -24,4 +24,4 @@ edit:
 	gedit README.md Makefile kahn.ml Implementations/miscellaneous.ml Implementations/thread.ml Implementations/pipe.ml Implementations/network.ml Implementations/sequential.ml test.ml &
 
 clean:
-	rm -f *.cmi *.cmo *.out implementation.ml miscellaneous.ml
+	rm -f *.cmi *.cmo *.out
