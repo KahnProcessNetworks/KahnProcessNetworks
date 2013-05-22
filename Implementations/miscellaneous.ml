@@ -2,7 +2,7 @@ open Unix
 
 (* Constant *******************************************************************)
 
-let trace_enable = false
+let trace_enable = true
 
 
 (* Trace function *************************************************************)

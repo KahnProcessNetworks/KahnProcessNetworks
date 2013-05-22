@@ -1,57 +1,82 @@
-(* Implementation with processes communicating through pipes. *****************)
+(* Implementation simulating parallelism sequentially. ************************)
 
 open Kahn
 open Miscellaneous
 open Unix
+open List
 
+
+
+(* Main ***********************************************************************)
 
 module S : S =
 struct
-    type 'a process = (unit -> 'a)
-    type 'a in_port = in_channel
-    type 'a out_port = out_channel
+  type 'a process = ('a -> unit) -> unit 
+  type 'a in_port = 'a Queue.t
+  type 'a out_port = 'a Queue.t
+  
+  
+  type 'a reponse = REPONSE of 'a 
+  let () = Random.self_init () 
+  
+  let new_channel () =
+    trace "new_channel";
+    let q = Queue.create () in
+      q, q
+  
+  let put v c f =
+    trace "put";
+    Queue.push v c;
+    f ()
+  
+  let send_result_to_f_and_do_some_work_at_the_same (proc:'a process) (f:'a->'b) =
+    let l = ref([]) in
+    let fill_and_continue (v:'a) = l:= [REPONSE(v)] in
+    proc fill_and_continue;
+    match (hd(!l)) with
+    |REPONSE (v) -> f v
     
-    let new_channel () =
-        trace "new_channel";
-        let (in_file_descr, out_file_descr) = pipe () in
-        let in_channel = in_channel_of_descr in_file_descr in
-        let out_channel = out_channel_of_descr out_file_descr in
-        (in_channel, out_channel)
-        
-    let put (v : 'a) (c : 'a out_port) () =
-        trace "put";
-        Marshal.to_channel c (v : 'a) [ Marshal.Closures ]
+(* missing part: do some work *)    
+     
+  
+  
+  let rec get c (f:('a->unit)) = 
+    trace "get";
+    try
+      let v = Queue.pop c in
+      f v       
+    with
+    Queue.Empty ->
+    send_result_to_f_and_do_some_work_at_the_same (get c) f 
+
+  let rec doco (l:(unit process list)) (g:(unit -> unit)) = (* doco très imparfait *)
+    trace "doco";
+    match l with
+    | [] -> failwith "doco on an empty list"
+    | [f] -> f g
+    | a::q -> a (fun f -> (doco q) g )        
+
+
+
+  let return v (f:('a->unit))=
+    trace "return";
+    f v
+  
+  let run (e:'a process)  =
+    trace "run";
+    let l = ref([]) in
+    let fill (v:'a) = l:= [REPONSE(v)] in   
+        e ((fun v -> fill v) );
+       match (hd(!l)) with
+    |REPONSE (v) -> v
+
+  
+  let bind (e:'a process) (e':('a -> 'b process)) =
+    trace "bind";
+    (* e' (run e) f     bon typage mais marche pas *)
+    (fun f -> send_result_to_f_and_do_some_work_at_the_same e e' f) 
     
-    let rec get (c : 'a in_port) () =
-        trace "get";
-        let v = ((Marshal.from_channel c) : 'a) in
-        v
     
-    let rec doco l () =
-        trace "doco";
-        match l with
-        | [] -> ()
-        | hd :: tl ->
-            match fork () with
-            | 0 ->
-                trace "fork (child)";
-                hd ()
-            | pid ->
-                trace "fork (father)";
-                doco tl ();
-                let _ = wait () in
-                ()
-    
-    let return v =
-        trace "return";
-        fun () -> v
-    
-    let bind e e' () =
-        trace "bind";
-        let v = e () in
-        e' v ()
-    
-    let run e =
-        trace "run";
-        e ()
+  
+  
 end
