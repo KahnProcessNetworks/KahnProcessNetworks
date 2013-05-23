@@ -15,3 +15,6 @@
 *.log
 *.swo
 *.swp
+
+# Miscellaneous
+*~

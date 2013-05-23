@@ -72,7 +72,7 @@ struct
             let sockdomain = domain_of_sockaddr p.addr in
             let socktype = SOCK_STREAM in
             let sock = socket sockdomain socktype 0 in
-            sleep 1;connect sock p.addr;
+            connect sock p.addr;
             let out_channel = out_channel_of_descr sock in
             p.channel <- out_channel;
             p.is_not_active <- false;

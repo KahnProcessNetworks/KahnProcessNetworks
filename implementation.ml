@@ -1,126 +1,82 @@
-(* Implementation with processes communicating through the network. ***********)
+(* Implementation simulating parallelism sequentially. ************************)
 
 open Kahn
 open Miscellaneous
 open Unix
+open List
 
 
-(* Auxilliar functions ********************************************************)
 
-let get_addr () =
-    trace "get_addr";
-    let host_name = gethostname () in
-    let host_entry = gethostbyname host_name in
-    host_entry.h_addr_list.(0)
-
-let make_sockaddr port =
-    trace "make_sockaddr";
-    let addr = get_addr () in
-    ADDR_INET (addr, port)
-
-(*
-Par défaut, on utilise l'adresse internet de la machine hôte uniquement. On
-pourrait imaginer un fichier de configuration contenant les adresses disponibles
-pour les sockets mais il faudrait savoir créer et utiliser des RPC en OCaml pour
-établir à distance les serveurs du réseau. 
-Pour mémoire :
-type sockaddr =
-    | ADDR_UNIX of string
-    | ADDR_INET of inet_addr * int
-*)
-
-
-(* Module *********************************************************************)
+(* Main ***********************************************************************)
 
 module S : S =
 struct
-    type 'a process = unit -> 'a
-    type 'a port =
-    {
-        addr: sockaddr;
-        mutable channel: 'a;
-        mutable is_not_active: bool
-    }
-    type 'a in_port = in_channel port
-    type 'a out_port = out_channel port
+  type 'a process = ('a -> unit) -> unit 
+  type 'a in_port = 'a Queue.t
+  type 'a out_port = 'a Queue.t
+  
+  
+  type 'a reponse = REPONSE of 'a 
+  let () = Random.self_init () 
+  
+  let new_channel () =
+    trace "new_channel";
+    let q = Queue.create () in
+      q, q
+  
+  let put v c f =
+    trace "put";
+    Queue.push v c;
+    f ()
+  
+  let send_result_to_f_and_do_some_work_at_the_same (proc:'a process) (f:'a->'b) =
+    let l = ref([]) in
+    let fill_and_continue (v:'a) = l:= [REPONSE(v)] in
+    proc fill_and_continue;
+    match (hd(!l)) with
+    |REPONSE (v) -> f v
     
-    let new_port addr channel is_not_active =
-        trace "new_port";
-        {
-            addr = addr;
-            channel = channel;
-            is_not_active = is_not_active;
-        }
+(* missing part: do some work *)    
+     
+  
+  
+  let rec get c (f:('a->unit)) = 
+    trace "get";
+    try
+      let v = Queue.pop c in
+      f v       
+    with
+    Queue.Empty ->
+    send_result_to_f_and_do_some_work_at_the_same (get c) f 
+
+  let rec doco (l:(unit process list)) (g:(unit -> unit)) = (* doco très imparfait *)
+    trace "doco";
+    match l with
+    | [] -> failwith "doco on an empty list"
+    | [f] -> f g
+    | a::q -> a (fun f -> (doco q) g )        
+
+
+
+  let return v (f:('a->unit))=
+    trace "return";
+    f v
+  
+  let run (e:'a process)  =
+    trace "run";
+    let l = ref([]) in
+    let fill (v:'a) = l:= [REPONSE(v)] in   
+        e ((fun v -> fill v) );
+       match (hd(!l)) with
+    |REPONSE (v) -> v
+
+  
+  let bind (e:'a process) (e':('a -> 'b process)) =
+    trace "bind";
+    (* e' (run e) f     bon typage mais marche pas *)
+    (fun f -> send_result_to_f_and_do_some_work_at_the_same e e' f) 
     
-    let new_channel =
-        let port = ref 1399 in
-        fun () ->
-            trace "new_channel";
-            incr port;
-            let sockaddr = make_sockaddr !port in
-            let in_channel = in_channel_of_descr stdin in
-            let in_port = new_port sockaddr in_channel true in
-            let out_channel = out_channel_of_descr stdout in
-            let out_port = new_port sockaddr out_channel true in
-            (in_port, out_port)
     
-    let put (v : 'a) p () =
-        trace "put";
-        if (p.is_not_active)
-        then
-            begin
-            let sockdomain = domain_of_sockaddr p.addr in
-            let socktype = SOCK_STREAM in
-            let sock = socket sockdomain socktype 0 in
-            sleep 1;connect sock p.addr;
-            let out_channel = out_channel_of_descr sock in
-            p.channel <- out_channel;
-            p.is_not_active <- false;
-            end;
-        Marshal.to_channel p.channel (v : 'a) [ Marshal.Closures ]
-    
-    let rec get p ()=
-        trace "get ";
-        if (p.is_not_active)
-        then
-            begin
-            let sockdomain = domain_of_sockaddr p.addr in
-            let socktype = SOCK_STREAM in
-            let sock = socket sockdomain socktype 0 in
-            bind sock p.addr;
-            listen sock 10;
-            let (file_descr, _) = accept sock in
-            let in_channel = in_channel_of_descr file_descr in
-            p.channel <- in_channel;
-            p.is_not_active <- false;
-            end;
-        ((Marshal.from_channel p.channel) : 'a)
-    
-    let rec doco l () =
-        trace "doco";
-        match l with
-        | [] -> ()
-        | hd :: tl ->
-            match fork () with
-            | 0 ->
-                trace "fork (child)";
-                hd ()
-            | pid ->
-                trace "fork (father)";
-                doco tl ();
-                let _ = waitpid [] pid in
-                ()
-    
-    let return v =
-        trace "return";
-        fun () -> v
-    
-    let bind e e' () =
-        trace "bind";
-        let v = e () in
-        e' v ()
-    
-    let run e =
-        trace "run";
-        e ()    
+  
+  
 end
