@@ -40,7 +40,7 @@ struct
       raise (Stop (fun () -> get c f))
 
 
-  let rec doco l = (* doco très imparfait *)
+  let rec doco l = 
     trace "doco";
     match l with
     | [] -> failwith "doco on an empty list"
@@ -67,8 +67,8 @@ struct
   
   let run e =
     trace "run";
-    let l = ref([]) in
-    let fill v = l:= [REPONSE(v)] in
+    let l = ref(None) in
+    let fill v = l:= Some(v) in
     let rec loop_until_success g =
       try 
         g ()
@@ -76,5 +76,5 @@ struct
       in
       loop_until_success (fun () -> e fill);
        match (hd(!l)) with
-    |REPONSE (v) ->  v
+    |Some(v) ->  v
 end
