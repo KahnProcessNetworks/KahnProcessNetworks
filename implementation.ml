@@ -4,14 +4,14 @@ open Kahn
 open Miscellaneous
 open Unix
 open List
-
+exception Stop of (unit -> unit) 
 
 
 (* Main ***********************************************************************)
 
 module S : S =
 struct
-  type 'a process = ('a -> unit) -> unit 
+  type 'a process = ('a -> unit) -> unit
   type 'a in_port = 'a Queue.t
   type 'a out_port = 'a Queue.t
   
@@ -27,56 +27,54 @@ struct
   let put v c f =
     trace "put";
     Queue.push v c;
-    f ()
+    raise (Stop (fun () -> f ()))
   
-  let send_result_to_f_and_do_some_work_at_the_same (proc:'a process) (f:'a->'b) =
-    let l = ref([]) in
-    let fill_and_continue (v:'a) = l:= [REPONSE(v)] in
-    proc fill_and_continue;
-    match (hd(!l)) with
-    |REPONSE (v) -> f v
-    
-(* missing part: do some work *)    
-     
-  
-  
-  let rec get c (f:('a->unit)) = 
+  let rec get c f = 
     trace "get";
     try
       let v = Queue.pop c in
-      f v       
+      raise (Stop (fun () -> f v))
+       
     with
     Queue.Empty ->
-    send_result_to_f_and_do_some_work_at_the_same (get c) f 
+      raise (Stop (fun () -> get c f))
 
-  let rec doco (l:(unit process list)) (g:(unit -> unit)) = (* doco très imparfait *)
+
+  let rec doco l = 
     trace "doco";
     match l with
     | [] -> failwith "doco on an empty list"
-    | [f] -> f g
-    | a::q -> a (fun f -> (doco q) g )        
-
-
-
+    | [f] -> f
+    | a::q -> 
+                 (fun s -> 
+		       
+		       try 
+			  a (fun () -> ());
+				    (doco q) s
+		      with
+			Stop (g)->	    (doco (q@[fun f -> g ()])) s
+               
+		)
   let return v (f:('a->unit))=
     trace "return";
     f v
   
-  let run (e:'a process)  =
-    trace "run";
-    let l = ref([]) in
-    let fill (v:'a) = l:= [REPONSE(v)] in   
-        e ((fun v -> fill v) );
-       match (hd(!l)) with
-    |REPONSE (v) -> v
-
   
   let bind (e:'a process) (e':('a -> 'b process)) =
     trace "bind";
-    (* e' (run e) f     bon typage mais marche pas *)
-    (fun f -> send_result_to_f_and_do_some_work_at_the_same e e' f) 
-    
-    
+    (fun f -> e (fun v -> let p = e' v in p f))
+
   
-  
+  let run e =
+    trace "run";
+    let l = ref([]) in
+    let fill v = l:= [REPONSE(v)] in
+    let rec loop_until_success g =
+      try 
+        g ()
+      with Stop f -> loop_until_success f
+      in
+      loop_until_success (fun () -> e fill);
+       match (hd(!l)) with
+    |REPONSE (v) ->  v
 end
