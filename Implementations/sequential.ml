@@ -16,7 +16,6 @@ struct
   type 'a out_port = 'a Queue.t
   
   
-  type 'a reponse = REPONSE of 'a 
   let () = Random.self_init () 
   
   let new_channel () =
@@ -62,7 +61,7 @@ struct
   
   let bind (e:'a process) (e':('a -> 'b process)) =
     trace "bind";
-    (fun f -> e (fun v -> let p = e' v in p f))
+    (fun f -> e (fun v -> e' v f))
 
   
   let run e =
@@ -75,6 +74,7 @@ struct
       with Stop f -> loop_until_success f
       in
       loop_until_success (fun () -> e fill);
-       match (hd(!l)) with
+       match !l with
     |Some(v) ->  v
+    |None -> assert false
 end
