@@ -5,11 +5,6 @@ open Miscellaneous
 open Unix
 
 
-(* IP Addresses ***************************************************************)
-
-let ip_addresses = []
-
-
 (* Auxilliar functions ********************************************************)
 
 let get_addr () =
