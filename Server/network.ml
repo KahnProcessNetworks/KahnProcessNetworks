@@ -4,15 +4,12 @@ open Arg
 open Sys
 open Unix
 
+let network_ip = ref ""
 let server_mode = ref false
-let status_mode = ref false
+let client_mode = ref false
 
 
-(* Server *********************************************************************)
-
-(*
-    Port 1400: communication for synchronisation
-*)
+(* Auxilliar functions ********************************************************)
 
 let retransmit in_file_descr out_file_descr =
     let buffer_size = 4096 in
@@ -36,8 +33,15 @@ let try_finalize f x finally y =
     z
 
 let rec restart_on_EINTR f x =
-  try f x
-  with Unix_error (EINTR, _, _) -> restart_on_EINTR f x
+    try f x
+    with Unix_error (EINTR, _, _) -> restart_on_EINTR f x
+  
+
+(* Server *********************************************************************)
+
+(*
+    Port 1400: communication for synchronisation
+*)
 
 let init_server_sock addr =
     let server_sock_domain = PF_INET in
@@ -88,6 +92,21 @@ let establish_server () =
     launch_server addr service
 
 
+(* Client *********************************************************************)
+
+let run_client () =
+    let port = 1400 in
+    let server_ip = "129.199.129.26" in
+    let server_addr = inet_addr_of_string server_ip in
+    let addr = ADDR_INET (server_addr, port) in
+    let sock = socket PF_INET SOCK_STREAM 0 in
+    connect sock addr;
+    dup2 sock stdout;
+    close sock;
+    retransmit stdin stdout;
+    close stdout
+
+
 (* Main ***********************************************************************)
 
 let main () =
@@ -95,18 +114,20 @@ let main () =
     let specification_list =
         align        
         [
+            ("-client", Set client_mode, " Initialize a new client");
             ("-server", Set server_mode, " Initialize a new server");
-            ("-status", Set status_mode, " Display the network status");
         ]
     in
-    let usage_message = "Usage: " ^ argv.(0) ^ " <options> \nOptions:" in
-    let anonymous_function _ =
-        usage specification_list usage_message;
+    let usage_message =
+        "Usage: " ^ argv.(0) ^ " XXX.XXX.XXX.XXX <options> \nOptions:"
+    in
+    let anonymous_function s =
+        network_ip := s;
         exit 1
     in
     parse specification_list anonymous_function usage_message;
-    if (!status_mode)
-    then Format.printf "status_mode@.";
+    if (!client_mode)
+    then handle_unix_error run_client ();
     if (!server_mode)
     then handle_unix_error establish_server ()
 
