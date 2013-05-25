@@ -1,5 +1,5 @@
 all:
-	ocamlc -o server.out unix.cma network.ml
+	ocamlc -o server.out unix.cma server.ml
 
 clean:
 	rm -f *~ *.cmi *.cmo *.out

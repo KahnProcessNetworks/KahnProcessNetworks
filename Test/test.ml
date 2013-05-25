@@ -26,6 +26,6 @@ struct
         K.doco [ count ]
 end
  
-module Exp = Example(Pipe) 
+module Exp = Example(Socket) 
 
-let () = Pipe.run(Exp.main ())
+let () = Socket.run(Exp.main ())

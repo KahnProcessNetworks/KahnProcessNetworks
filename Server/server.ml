@@ -2,6 +2,7 @@
 
 open Arg
 open Format
+open Marshal
 open Sys
 open Unix
 
@@ -11,12 +12,28 @@ let config = "network.config"
 let init = ref false
 
 
+let retransmit in_file_descr out_file_descr =
+    let buffer_size = 4096 in
+    let buffer = String.create buffer_size in
+    let rec copy() =
+        match read in_file_descr buffer 0 buffer_size with
+        | 0 -> ()
+        | n ->
+            ignore (write out_file_descr buffer 0 n);
+            copy ()
+    in
+    copy ()
+
 let service client_sock =
     dup2 client_sock stdin;
     close client_sock;
+    let file_descr = openfile "a.out" [O_WRONLY; O_CREAT] 0o751 in
+    retransmit stdin file_descr
+(*
     let in_channel = in_channel_of_descr stdin in
-    let v = ((Marshal.from_channel in_channel) : (unit -> unit)) in
-    v ()
+    let e = ((from_channel in_channel) : unit -> unit) in
+    e ()
+*)
 
 let init_server_sock addr =
     let sock = socket PF_INET SOCK_STREAM 0 in

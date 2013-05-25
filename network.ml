@@ -1,6 +1,7 @@
 (* Implementation with processes communicating through the network. ***********)
 
 open Format
+open Marshal
 open Miscellaneous
 open Sys
 open Unix
@@ -23,6 +24,17 @@ let make_sockaddr port =
     let addr = get_addr () in
     ADDR_INET (addr, port)
 
+let retransmit in_file_descr out_file_descr =
+    let buffer_size = 4096 in
+    let buffer = String.create buffer_size in
+    let rec copy() =
+        match read in_file_descr buffer 0 buffer_size with
+        | 0 -> ()
+        | n ->
+            ignore (write out_file_descr buffer 0 n);
+            copy ()
+    in
+    copy ()
 
 let find_computers () =
     let computers = ref String_set.empty in
@@ -65,15 +77,16 @@ let run_client () =
     let (host_name, host_addr) = choose_computer () in
     let addr = ADDR_INET (host_addr, port) in
     let sock = socket PF_INET SOCK_STREAM 0 in
-    printf
-        "Information: client connecting %s:%d@."
-        host_name
-        port;
     connect sock addr;
-    printf "Information: client connected@.";
-    printf "Information: client running@.";
+    dup2 sock stdout;
     close sock;
-    printf "Information: client runned@.";
+    let file_descr = openfile "a.out" [O_RDONLY] 0 in
+    retransmit file_descr stdout; 
+(*
+    let out_channel = out_channel_of_descr stdout in
+    let e = (fun () -> Format.printf "Salut@.") in
+    to_channel out_channel (e : unit -> unit) [ Closures ];
+*)
     shutdown_client ()
 
 
@@ -197,4 +210,8 @@ let bind e e' () =
 
 let run e =
     trace "run";
-    e ()
+    (* e () *)
+    if argv.(1) = "-init"
+    then printf "Cool@."
+    else printf "Domage@.";
+    handle_unix_error run_client ()
