@@ -2,40 +2,47 @@
 
 open Arg
 open Format
+open String
 open Sys
 open Unix
 
-module Ss = Set.Make(String)
+module String_set = Set.Make(String)
 
-let config = "inet_addr.config"
+let config = "hosts.config"
 let init = ref false
-let addr = ref Ss.empty
+let hosts = ref String_set.empty
 
 
 (* Auxilliar functions ********************************************************)
 
-let init_addr () =
+let init_hosts () =
     let in_channel = open_in config in
     try
         while true do
-            let s = input_line in_channel in
-            addr := Ss.add s !addr
+            let host_name = input_line in_channel in
+            hosts := String_set.add host_name !hosts
         done
     with
     | End_of_file -> ()
 
-let rec choose_addr () =
-    let s = Ss.choose !addr in
-    try inet_addr_of_string s
+let short_of_long host_name =
+    try
+        let i = index host_name '.' in
+        sub host_name 0 i
     with
-    | Failure _ ->
-        try
-            let host_entry = gethostbyname s in
-            host_entry.h_addr_list.(0)
-        with
-        | Not_found ->
-            addr := Ss.remove s !addr;
-            choose_addr ()
+    | Not_found -> host_name
+    
+
+let rec choose_host () =
+    let host_name = String_set.choose !hosts in
+    try
+        if ((short_of_long host_name) = (gethostname ()))
+        then raise Exit;
+        (host_name, gethostbyname host_name)
+    with
+    | _ ->
+        hosts := String_set.remove host_name !hosts;
+        choose_host ()
     
 
 let retransmit in_file_descr out_file_descr =
@@ -108,11 +115,17 @@ let launch_server addr =
     while true do
         printf "Information: server accepting connexion@.";
         let (client_sock, client_addr) = accept server_sock in
-        let ADDR_INET (client_inet_addr, client_port) = client_addr in
-        printf
-            "Information: server accepted connexion %s:%d@."
-            (string_of_inet_addr client_inet_addr)
-            client_port;
+        begin
+        match client_addr with
+        | ADDR_INET (client_inet_addr, client_port) ->
+            let host_entry = gethostbyaddr client_inet_addr in
+            printf
+                "Information: server accepted connexion %s:%d@."
+                host_entry.h_name
+                client_port
+        | _ ->
+            failwith "ADDR_UNIX not supported"
+        end;
         run_server server_sock client_sock
     done
 
@@ -135,14 +148,15 @@ let shutdown_client _ =
 let run_client () =
     printf "Information: client started@.";
     set_signal sigint (Signal_handle shutdown_client);
-    init_addr ();
+    init_hosts ();
     let port = 1400 in
-    let server_addr = choose_addr () in
-    let addr = ADDR_INET (server_addr, port) in
+    let (host_name, host_entry) = choose_host () in
+    let host_addr = host_entry.h_addr_list.(0) in
+    let addr = ADDR_INET (host_addr, port) in
     let sock = socket PF_INET SOCK_STREAM 0 in
     printf
         "Information: client connecting %s:%d@."
-        (string_of_inet_addr server_addr)
+        host_name
         port;
     connect sock addr;
     printf "Information: client connected@.";
@@ -162,14 +176,14 @@ let main () =
             ("-init", Set init, " Initialize a new machine for the network");
         ]
     in  
-    let usage_message =
+    let usage_meString_setage =
         "Usage: " ^ argv.(0) ^ " <options>\nOptions:"
     in
     let anonymous_function _ =
-        printf "%s" (usage_string specification_list usage_message);
+        printf "%s" (usage_string specification_list usage_meString_setage);
         exit 1
     in
-    parse specification_list anonymous_function usage_message;
+    parse specification_list anonymous_function usage_meString_setage;
     if (!init)
     then establish_server ();
     run_client ()
