@@ -1,8 +1,8 @@
 all:
-	ocamlc -o network.out unix.cma network.ml
+	ocamlc -o server.out unix.cma network.ml
 
 clean:
 	rm -f *~ *.cmi *.cmo *.out
 
 edit:
-	gedit makefile network.ml &
+	gedit makefile server.ml network.config &

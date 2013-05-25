@@ -146,5 +146,5 @@ struct
     
     let run e =
         trace "run";
-        e ()    
+        e ()
 end
