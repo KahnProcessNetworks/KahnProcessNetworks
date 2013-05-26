@@ -2,27 +2,15 @@
 
 open Format
 open Marshal
-open Miscellaneous
+open Server
 open Sys
 open Unix
 
-module String_set = Set.Make(String)
-
 let config = "network.config"
+let doco_father = ref ""
 
 
 (* Auxilliar functions ********************************************************)
-
-let get_addr () =
-    trace "get_addr";
-    let host_name = gethostname () in
-    let host_entry = gethostbyname host_name in
-    host_entry.h_addr_list.(0)
-
-let make_sockaddr port =
-    trace "make_sockaddr";
-    let addr = get_addr () in
-    ADDR_INET (addr, port)
 
 let retransmit in_file_descr out_file_descr =
     let buffer_size = 4096 in
@@ -37,57 +25,44 @@ let retransmit in_file_descr out_file_descr =
     copy ()
 
 let find_computers () =
-    let computers = ref String_set.empty in
+    let computers = ref [] in
     let in_channel = open_in config in
     try
         while true do
             let computer = input_line in_channel in
-            computers := String_set.add computer !computers
+            computers := computer :: !computers
         done;
         !computers
     with
     | End_of_file -> !computers
 
-let choose_computer () =
+let choose_computers n =
     let computers = find_computers () in
-    let rec choose computers =
-        let computer = String_set.choose computers in
-        try
-            (computer, inet_addr_of_string computer)
-        with
-        | Failure _ ->
-            try
-                let host_entry = gethostbyname computer in
-                (computer, host_entry.h_addr_list.(0))
-            with
-            | _ -> choose (String_set.remove computer computers)
+    let rec choose n computers =
+        match n with
+        | 0 -> []
+        | _ ->
+            match computers with
+            | [] -> failwith "empty network"
+            | _ ->
+                let p _ = Random.bool () in
+                let (l1, l2) = List.partition p computers in
+                let computers = l1 in
+                let l3 = choose (n - 1) computers in
+                match computers with
+                | [] -> failwith "empty network"
+                | computer :: tl ->
+                    try
+                        (computer, inet_addr_of_string computer) :: l3
+                    with
+                    | _ ->
+                        try
+                            let host_entry = gethostbyname computer in
+                            (computer, host_entry.h_addr_list.(0)) :: l3
+                        with
+                        | _ -> choose n tl
     in
-    choose computers
-
-
-(* Client *********************************************************************)
-
-let shutdown_client _ =
-    exit 0
-
-let run_client () =
-    trace "run_client";
-    set_signal sigint (Signal_handle shutdown_client);
-    let port = 1400 in
-    let (host_name, host_addr) = choose_computer () in
-    let addr = ADDR_INET (host_addr, port) in
-    let sock = socket PF_INET SOCK_STREAM 0 in
-    connect sock addr;
-    dup2 sock stdout;
-    close sock;
-    let file_descr = openfile "a.out" [O_RDONLY] 0 in
-    retransmit file_descr stdout; 
-(*
-    let out_channel = out_channel_of_descr stdout in
-    let e = (fun () -> Format.printf "Salut@.") in
-    to_channel out_channel (e : unit -> unit) [ Closures ];
-*)
-    shutdown_client ()
+    choose n computers
 
 
 (* Module *********************************************************************)
@@ -95,123 +70,121 @@ let run_client () =
 type 'a process = unit -> 'a
 type 'a port =
 {
-    addr: sockaddr;
-    mutable channel: 'a;
-    mutable is_not_active: bool
+    id: int;
+    mutable chan: 'a;
+    mutable is_active: bool;
 }
 type 'a in_port = in_channel port
 type 'a out_port = out_channel port
 
-let new_port addr channel is_not_active =
-    trace "new_port";
-    {
-        addr = addr;
-        channel = channel;
-        is_not_active = is_not_active;
-    }
+let new_port id chan is_active =
+{
+    id = id;
+    chan = chan;
+    is_active = is_active;
+}
 
 let new_channel =
-    let port = ref 1399 in
+    let id = ref 0 in
     fun () ->
-        trace "new_channel";
-        incr port;
-        let sockaddr = make_sockaddr !port in
-        let in_channel = in_channel_of_descr stdin in
-        let in_port = new_port sockaddr in_channel true in
-        let out_channel = out_channel_of_descr stdout in
-        let out_port = new_port sockaddr out_channel true in
+        incr id;
+        let in_chan = in_channel_of_descr stdin in
+        let in_port = new_port !id in_chan false in
+        let out_chan = out_channel_of_descr stdout in
+        let out_port = new_port !id out_chan false in
         (in_port, out_port)
 
-let new_socket addr =
-    let sockdomain = domain_of_sockaddr addr in
-    let socktype = SOCK_STREAM in
-    socket sockdomain socktype 0
-
-let rec rec_connect sock addr =
-    try
-        connect sock addr
-    with
-        _ -> rec_connect sock addr
-
-let retransmit in_channel out_channel =
-    while true do
-        let v = ((Marshal.from_channel in_channel) : 'a) in
-        Marshal.to_channel out_channel (v : 'a) [ Marshal.Closures ]
-    done
-
 let put (v : 'a) p () =
-    trace "put";
-    if (p.is_not_active)
-    then
-        begin
-        let (in_file_descr, out_file_descr) = pipe () in
-        match Unix.fork () with
-        | 0 ->
-            let in_channel = in_channel_of_descr in_file_descr in
-            close out_file_descr;
-            let sock = new_socket p.addr in
-            rec_connect sock p.addr;
-            let out_channel = out_channel_of_descr sock in
-            retransmit in_channel out_channel
-        | _ ->
-            close in_file_descr;
-            let out_channel = out_channel_of_descr out_file_descr in
-            p.channel <- out_channel;
-            p.is_not_active <- false;
-        end;
-    Marshal.to_channel p.channel (v : 'a) [ Marshal.Closures ]
+    if (p.is_active)
+    then Marshal.to_channel p.chan (v : 'a) [Marshal.Closures]
+    else
+        (** TODO: Fork pour créer un envoyeur **)
+            (** TODO: Le père continu sa route **)
+            (** TODO: Le fils retransmet les paquets **)
+                (** TODO: Demander au père du doco **)
+                (** TODO: Recevoir la réponse du père **)
+        failwith "put not implemented"
+    
 
-let rec get p ()=
-    trace "get ";
-    if (p.is_not_active)
-    then
-        begin
-        let (in_file_descr, out_file_descr) = pipe () in
-        match Unix.fork () with
-        | 0 ->
-            close in_file_descr;
-            let out_channel = out_channel_of_descr out_file_descr in
-            let sock = new_socket p.addr in
-            bind sock p.addr;
-            listen sock 10;
-            let (file_descr, _) = accept sock in
-            let in_channel = in_channel_of_descr file_descr in
-            retransmit in_channel out_channel
-        | _ ->
-            let in_channel = in_channel_of_descr in_file_descr in
-            close out_file_descr;
-            p.channel <- in_channel;
-            p.is_not_active <- false;
-        end;
-    ((Marshal.from_channel p.channel) : 'a)
+let rec get p () : 'a =
+    if (p.is_active)
+    then ((Marshal.from_channel p.chan) : 'a)
+    else
+        (** TODO: Fork pour créer un réceptionneur **)
+            (** TODO: Le père bloque puis continu sa route **)
+            (** TODO: Le fils retransmet les paquets **)
+                (** TODO: Demander au père du doco **)
+                (** TODO: Recevoir la réponse du père **)
+        failwith "get not implemented"
+
+let distribute l =
+    (* Select computers over the network *)
+    let n = List.length l in
+    let computers = choose_computers n in
+    let l = List.combine l computers in
+    match fork () with
+    | 0 ->
+        (* Launch the service information about channels *)
+        let mem = Hashtbl.create 50 in
+        let rec service server_sock =
+            let (client_sock, client_addr1) = accept server_sock in
+            let in_chan = in_channel_of_descr client_sock in
+            let out_chan1 = out_channel_of_descr client_sock in
+            let id = ((Marshal.from_channel in_chan) : int) in
+            try
+                let (client_addr2, out_chan2) = Hashtbl.find mem id in
+                to_channel out_chan1 client_addr2 [Marshal.Closures];
+                to_channel out_chan2 client_addr1 [Marshal.Closures];
+                close_out out_chan1;
+                close_out out_chan2
+            with
+            | Not_found ->
+                Hashtbl.add mem id (client_addr1, out_chan1);
+                service server_sock
+        in
+        Server.launch Sequential 1401 service
+    | _ ->
+        (* Request runs over the network *)
+        (** TODO: Envoyer le nom de l'ordinateur et les processus à exécuter **)
+        (** TODO: Configurer les demandes d'interruption par signaux **)
+        (** TODO: Réceptionner toutes les fins de calcul **)
+        ()
 
 let rec doco l () =
-    trace "doco";
     match l with
     | [] -> ()
-    | hd :: tl ->
-        match fork () with
-        | 0 ->
-            trace "fork (child)";
-            hd ()
-        | pid ->
-            trace "fork (father)";
-            doco tl ();
-            ignore (waitpid [] pid)
+    | _ -> distribute l
 
 let return v =
-    trace "return";
     fun () -> v
 
 let bind e e' () =
-    trace "bind";
     let v = e () in
     e' v ()
 
+let rec wait () : 'a =
+    let service client_sock =
+        let in_chan = in_channel_of_descr client_sock in
+        let (father, e') = ((Marshal.from_channel in_chan) : string * 'a process) in
+        close client_sock;
+        doco_father := father;
+        (** TODO: Rediriger stdin, stdout et sterr vers le père **)
+        (** TODO: Rajouter le waitpid **)
+        match fork () with
+        | 0 -> (wait () : 'a)
+        | _ -> (e' () : 'a)
+    in
+    (Server.launch Fork 1400 service : 'a)
+
 let run e =
-    trace "run";
-    (* e () *)
-    if argv.(1) = "-init"
-    then printf "Cool@."
-    else printf "Domage@.";
-    handle_unix_error run_client ()
+    let n = Array.length argv in
+    if ("-wait" = argv.(n - 1))
+    then
+        (* Wait until a doco over the network requests a run *)
+        (wait () : 'a)
+    else
+        (* Fork to wait for a doco and run the process *)
+        (** TODO: Rajouter le waitpid **)
+        match fork () with
+        | 0 -> (wait () : 'a)
+        | _ -> (e () : 'a)

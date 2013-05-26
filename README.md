@@ -30,6 +30,7 @@ We have made the implementation without taking care about `Unix` errors. For exa
 
 ## Note
 * Marshal functional values is possible only if the two sides (sender and receiver) are the same program.
+* Use a double fork instead of one could be a very good idea to avoid cluttering the memory.
 
 ## Authors
 - [**Axel Davy**](http://github.com/axeldavy)

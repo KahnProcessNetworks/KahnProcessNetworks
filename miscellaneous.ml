@@ -17,3 +17,14 @@ let trace =
             Format.printf "// l: %d  pid: %d  f: %s@." !i (getpid ()) s
             end
         else ()
+
+
+(* Miscellaneous **************************************************************)
+
+let try_finally f x finally y =
+    let result =
+        try f x
+        with exn -> finally y; raise exn
+    in
+    finally y;
+    result
