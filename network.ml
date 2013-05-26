@@ -43,6 +43,7 @@ let find_computers () =
 
 let choose_computers n =
     let computers = find_computers () in
+    List.iter (fun s -> printf "%s@." s) computers;
     let rec choose n computers =
         match n with
         | 0 -> []

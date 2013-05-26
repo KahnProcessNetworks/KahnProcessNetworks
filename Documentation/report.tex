@@ -14,23 +14,11 @@
 	\maketitle
 
 
-\section{Choix techniques}
-Aucun.
-
-\section{Difficultés rencontrées}
-Aucune.
-
-\section{\'Eléments non réalisés}
-Aucun.
-
 \section{Installation}
 
 Une fois l'archive \texttt{davy-lefebvre.tgz} récupérée et les fichiers extraits placez-vous dans le répertoire \texttt{davy-lefebvre}. Dans ce répertoire la commande :
 \begin{itemize}
-	\item \texttt{make} ou \texttt{make thread} : compile notre programme avec l'implémentation naïve qui utilise la bibliothèque de threads d'OCaml
-	\item \texttt{make pipe} : compile notre programme avec l'implémentation reposant sur l'utilisation de processus Unix communiquant par des tubes
-	\item \texttt{make network} : compile notre programme avec l'implémentation s'exécutant à travers le réseau
-	\item \texttt{make sequential} : compile notre programme avec l'implémentation séquentielle où le parallélisme est simulé par notre programme
+	\item \texttt{make} : compile notre programme
 \end{itemize}
 Pour la désinstallation la commande :
 \begin{itemize}
@@ -45,7 +33,8 @@ en vérifiant à bien avoir installé au préalable le système de contrôle de 
 \section{Commentaires}
 
 \subsection{Implémentation Pipe}
-vide
+Pas de commentaires particuliers
+
 \subsection{Implémentation Network}
 La toute première implémentation de Network que l'on a réalisé était assez
 peu performante: On avait considéré que les put et les get étaient des
@@ -62,15 +51,36 @@ connections actives, et donc en évitant de refaire des connections à chaque
 put et get, nous sommes partis sur un tout autre concept permettant
 d'utiliser vraiment plusieurs machines du réseau, au lieu d'utiliser le
 réseau local de notre ordinateur.
-\subsection{implémentation Sequential}
+
+Nous avons cherché à faire une implémentation vraiment complète à ce niveau
+là: au départ plusieurs machines sont en attente d'ordres et uen machine
+commence le programme. Chaque \verb!doco! fait appel à des machines en
+attentes pour réaliser les taches, puis met la machine ayant fait le
+\verb!doco! en attente elle-même. Les machines ayant reçu un ordre font un
+fork pour avoir une instance du programme qui attend des ordres et une
+autre qui exécute, ce qui fait que toutes les machines sont susceptibles à
+tout moment de recevoir des ordres. 
+
+Nous avons rencontré un certain nombre de problèmes dont le plus gros étant Marshal qui ne
+supportait pas les types abstraits (que l'on utilisait pour définir les
+connections ouvertes). 
+
+
+
+\subsection{Implémentation Sequential}
 Notre première approche a été de considerer qu'un processus pouvait soit
 terminer, soit rendre la main sans avoir terminé. Dans cette
 implémentation, les processus avaient le type \verb!'a process = ('a -> unit) -> Status! avec \verb!Status! indiquant si le processus avait terminé, ou s'il fallait le rappeler. \verb!doco! devait donc appeler un à un les processus et en fonction du résultat renvoyé, savait s'il fallait rappeler le processus plus tard ou pas. 
-Le problème de cette implémentation se situait au niveau de \verb!bind!: \verb!bind! devait au premier appel exécuter le processus \verb!e! et conserver son résultat, puis au second appel exécuter \verb!e'! avec le résultat conservé, mais surtout, il devait aux appels suivant conserver les modifications appliquées à \verb!e'! (qui à chaque appel pouvait évoluer). Par exemple si l'on execute le process \verb!integers! de l'exemple donné, après 2n appels au process, on se retrouve à n appels de \verb!bind! imbriqués. La complexité de l'implémentation était en O($n^2$), ce qui n'était pas satisfaisant.
+Le problème de cette implémentation se situait au niveau de \verb!bind!:
+\verb!bind e e'! devait au premier appel exécuter le processus \verb!e! et conserver son résultat, puis au second appel exécuter \verb!e'! avec le résultat conservé, mais surtout aux appels suivant conserver les modifications appliquées à \verb!e'! (qui à chaque appel pouvait évoluer). Par exemple si l'on execute le processus \verb!integers! de l'exemple donné, après n appels au processus, on se retrouve à n appels de \verb!bind! imbriqués. La complexité de l'implémentation était en O($n^2$), ce qui n'était pas satisfaisant.
 
-Pour améliorer l'implémentation, le retour des fonctions a été remplacé par une exception à lever si le programme devait être rappelé. Le programme s'exécutait plus rapidement, mais la complexité était toujours en O($n^2$).
+Pour améliorer l'implémentation, le retour des fonctions a été remplacé par
+une exception à lever si le processus devait être rappelé. Le programme
+s'exécutait plus rapidement (un facteur 3 environ), mais la complexité était toujours en O($n^2$).
 
-Finalement cette dernière implémentation a été améliorée pour renvoyer lors de l'exception la fonction permettant d'exécuter la suite du processus. \verb!doco! faisait pas la suite appel à cette fonction et non pas au processus initial qui avait été modifié. Il n'y a donc plus le problème d'appels imbriqués et la complexité est linéaire.
+Finalement cette dernière implémentation a été améliorée pour renvoyer lors
+de l'exception la fonction permettant d'exécuter la suite du
+processus. \verb!doco! faisait ensuite appel à cette fonction et non pas au processus initial qui avait été modifié. Il n'y a donc plus le problème d'appels imbriqués et la complexité est linéaire.
 
 Lors de nos tests, la vitesse de cette implémentation était très proche de celle de pipe.
 
