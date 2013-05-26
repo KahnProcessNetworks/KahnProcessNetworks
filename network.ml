@@ -18,7 +18,8 @@ let retransmit in_file_descr out_file_descr : 'a =
     let out_chan = out_channel_of_descr out_file_descr in
     while (true) do
         let v = (from_channel in_chan : 'a) in
-        to_channel out_chan (v : 'a) [Closures]
+        to_channel out_chan (v : 'a) [Closures];
+        flush out_chan;
     done;
     (from_channel in_chan : 'a)
 
@@ -95,7 +96,10 @@ let new_channel =
 
 let put (v : 'a) p () =
     if (p.is_active)
-    then to_channel p.chan (v : 'a) [Closures]
+    then
+        begin
+        to_channel p.chan (v : 'a) [Closures];
+        flush p.chan
     else
         let (in_file_descr, out_file_descr) = pipe () in
         (** TODO: Changer en double fork pour les performances **)
@@ -113,7 +117,8 @@ let put (v : 'a) p () =
             close in_file_descr;
             p.chan <- out_channel_of_descr out_file_descr;
             p.is_active <- true;
-            to_channel p.chan (v : 'a) [Closures]
+            to_channel p.chan (v : 'a) [Closures];
+            flush p.chan
 
 let rec get p () : 'a =
     if (p.is_active)
@@ -154,7 +159,9 @@ let distribute (l : unit process list) : unit =
             try
                 let (client_addr2, out_chan2) = Hashtbl.find mem id in
                 to_channel out_chan1 client_addr2 [Marshal.Closures];
+                flush out_chan1;
                 to_channel out_chan2 client_addr1 [Marshal.Closures];
+                flush out_chan2;
                 close_out out_chan1;
                 close_out out_chan2
             with
@@ -179,6 +186,7 @@ let distribute (l : unit process list) : unit =
                     let out_chan = out_channel_of_descr sock in
                     let m = (!current_computer, computer, e) in
                     to_channel out_chan (m : unit request) [Closures];
+                    flush out_chan;
                     (* Wait for acknowledgment. *)
                     let in_chan = in_channel_of_descr sock in
                     ignore(from_channel in_chan : unit);
