@@ -22,10 +22,13 @@ struct
         in
         loop 0
     
-    let main () : unit K.process =
-        K.doco [ count ]
+    let parallel_count () : unit K.process =
+        K.doco [ count; ]
+    
+    let main () : unit =
+        K.run (parallel_count ())
 end
  
-module Exp = Example(Pipe) 
+module Exp = Example(Socket)
 
-let () = Pipe.run(Exp.main ())
+let () = Exp.main ()
