@@ -7,7 +7,8 @@ open Sys
 open Unix
 
 let config = "network.config"
-let doco_father = ref ""
+let father_computer = ref ""
+let current_computer = ref ""
 
 
 (* Auxilliar functions ********************************************************)
@@ -73,6 +74,7 @@ type 'a port =
 }
 type 'a in_port = in_channel port
 type 'a out_port = out_channel port
+type 'a request = string * string * 'a process
 
 let new_port id chan is_active =
 {
@@ -101,7 +103,7 @@ let put (v : 'a) p () =
         | 0 ->
             (* Establish a relay *)
             close out_file_descr;
-            let host = gethostbyname !doco_father in
+            let host = gethostbyname !father_computer in
             let addr = ADDR_INET (host.h_addr_list.(0), 1401) in
             let sock = socket PF_INET SOCK_STREAM 0 in
             connect sock addr;
@@ -123,7 +125,7 @@ let rec get p () : 'a =
         | 0 ->
             (* Establish a relay *)
             close in_file_descr;
-            let host = gethostbyname !doco_father in
+            let host = gethostbyname !father_computer in
             let addr = ADDR_INET (host.h_addr_list.(0), 1401) in
             let sock = socket PF_INET SOCK_STREAM 0 in
             connect sock addr;
@@ -133,13 +135,13 @@ let rec get p () : 'a =
             close out_file_descr;
             p.chan <- in_channel_of_descr in_file_descr;
             p.is_active <- true;
-            ((from_channel p.chan) : 'a)
+            (from_channel p.chan : 'a)
 
-let distribute l =
+let distribute (l : unit process list) : unit =
     (* Select computers over the network *)
     let n = List.length l in
     let computers = choose_computers n in
-    let _ = List.combine l computers in
+    let l = List.combine l computers in
     match fork () with
     | 0 ->
         (* Launch the service information about channels *)
@@ -148,7 +150,7 @@ let distribute l =
             let (client_sock, client_addr1) = accept server_sock in
             let in_chan = in_channel_of_descr client_sock in
             let out_chan1 = out_channel_of_descr client_sock in
-            let id = ((Marshal.from_channel in_chan) : int) in
+            let id = (from_channel in_chan : int) in
             try
                 let (client_addr2, out_chan2) = Hashtbl.find mem id in
                 to_channel out_chan1 client_addr2 [Marshal.Closures];
@@ -163,10 +165,30 @@ let distribute l =
         Server.launch Sequential 1401 service
     | _ ->
         (* Request runs over the network *)
-        (** TODO: Envoyer le nom de l'ordinateur et les processus à exécuter **)
-        (** TODO: Configurer les demandes d'interruption par signaux **)
-        (** TODO: Réceptionner toutes les fins de calcul **)
-        ()
+        (** TODO: Configurer les interruptions par signaux **)
+        let rec send l =
+            match l with
+            | [] -> ()
+            | (e, (computer, addr_inet)) :: tl ->
+                match fork () with
+                | 0 ->
+                    (* Send the name of the computer and the process to run. *)
+                    let addr = ADDR_INET (addr_inet, 1400) in
+                    let sock = socket PF_INET SOCK_STREAM 0 in
+                    connect sock addr;
+                    let out_chan = out_channel_of_descr sock in
+                    let m = (!current_computer, computer, e) in
+                    to_channel out_chan (m : unit request) [Closures];
+                    (* Wait for acknowledgment. *)
+                    let in_chan = in_channel_of_descr sock in
+                    ignore(from_channel in_chan : unit);
+                    close sock;
+                    exit 0
+                | pid ->
+                    send tl;
+                    ignore (waitpid [] pid)
+        in
+        send l
 
 let rec doco l () =
     match l with
@@ -183,9 +205,11 @@ let bind e e' () =
 let rec wait () : 'a =
     let service client_sock =
         let in_chan = in_channel_of_descr client_sock in
-        let (father, e') = ((Marshal.from_channel in_chan) : string * 'a process) in
+        let m = ((from_channel in_chan) : 'a request) in
+        let (father, computer, e') = m in
         close client_sock;
-        doco_father := father;
+        father_computer := father;
+        current_computer := computer;
         (** TODO: Rediriger stdin, stdout et sterr vers le père **)
         (** TODO: Rajouter le waitpid **)
         match fork () with
@@ -202,7 +226,7 @@ let run e =
         (wait () : 'a)
     else
         (* Fork to wait for a doco and run the process *)
-        (** TODO: Rajouter le waitpid **)
+        (** TODO:    Rajouter le waitpid **)
         match fork () with
         | 0 -> (wait () : 'a)
         | _ -> (e () : 'a)
