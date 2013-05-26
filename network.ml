@@ -96,26 +96,46 @@ let new_channel =
 
 let put (v : 'a) p () =
     if (p.is_active)
-    then Marshal.to_channel p.chan (v : 'a) [Marshal.Closures]
+    then to_channel p.chan (v : 'a) [Closures]
     else
-        (** TODO: Fork pour créer un envoyeur **)
-            (** TODO: Le père continu sa route **)
-            (** TODO: Le fils retransmet les paquets **)
-                (** TODO: Demander au père du doco **)
-                (** TODO: Recevoir la réponse du père **)
-        failwith "put not implemented"
+        let (in_file_descr, out_file_descr) = pipe () in
+        (** TODO: Changer en double fork pour les performances **)
+        match fork () with
+        | 0 ->
+            (* Establish a relay *)
+            close out_file_descr;
+            let host = gethostbyname !doco_father in
+            let addr = ADDR_INET (host.h_addr.list.(0), 1401) in
+            let sock = socket PF_INET SOCK_STREAM 0 in
+            connect sock addr;
+            retransmit in_file_descr sock
+        | _ ->
+            (* Continue with put to relay *)
+            close in_file_descr;
+            p.chan <- out_channel_of_descr out_file_descr
+            p.is_active <- true
     
 
 let rec get p () : 'a =
     if (p.is_active)
-    then ((Marshal.from_channel p.chan) : 'a)
+    then ((from_channel p.chan) : 'a)
     else
-        (** TODO: Fork pour créer un réceptionneur **)
-            (** TODO: Le père bloque puis continu sa route **)
-            (** TODO: Le fils retransmet les paquets **)
-                (** TODO: Demander au père du doco **)
-                (** TODO: Recevoir la réponse du père **)
-        failwith "get not implemented"
+        let (in_file_descr, out_file_descr) = pipe () in
+        (** TODO: Changer en double fork pour les performances **)
+        match fork () with
+        | 0 ->
+            (* Establish a relay *)
+            close in_file_descr;
+            let host = gethostbyname !doco_father in
+            let addr = ADDR_INET (host.h_addr.list.(0), 1401) in
+            let sock = socket PF_INET SOCK_STREAM 0 in
+            connect sock addr;
+            retransmit sock out_file_descr
+        | _ ->
+            (* Continue with put to relay *)
+            close out_file_descr;
+            p.chan <- in_channel_of_descr in_file_descr
+            p.is_active <- true
 
 let distribute l =
     (* Select computers over the network *)
