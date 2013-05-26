@@ -14,23 +14,11 @@
 	\maketitle
 
 
-\section{Choix techniques}
-Aucun.
-
-\section{Difficultés rencontrées}
-Aucune.
-
-\section{\'Eléments non réalisés}
-Aucun.
-
 \section{Installation}
 
 Une fois l'archive \texttt{davy-lefebvre.tgz} récupérée et les fichiers extraits placez-vous dans le répertoire \texttt{davy-lefebvre}. Dans ce répertoire la commande :
 \begin{itemize}
-	\item \texttt{make} ou \texttt{make thread} : compile notre programme avec l'implémentation naïve qui utilise la bibliothèque de threads d'OCaml
-	\item \texttt{make pipe} : compile notre programme avec l'implémentation reposant sur l'utilisation de processus Unix communiquant par des tubes
-	\item \texttt{make network} : compile notre programme avec l'implémentation s'exécutant à travers le réseau
-	\item \texttt{make sequential} : compile notre programme avec l'implémentation séquentielle où le parallélisme est simulé par notre programme
+	\item \texttt{make} : compile notre programme
 \end{itemize}
 Pour la désinstallation la commande :
 \begin{itemize}
@@ -45,7 +33,8 @@ en vérifiant à bien avoir installé au préalable le système de contrôle de 
 \section{Commentaires}
 
 \subsection{Implémentation Pipe}
-vide
+Pas de commentaires particuliers
+
 \subsection{Implémentation Network}
 La toute première implémentation de Network que l'on a réalisé était assez
 peu performante: On avait considéré que les put et les get étaient des
@@ -62,6 +51,22 @@ connections actives, et donc en évitant de refaire des connections à chaque
 put et get, nous sommes partis sur un tout autre concept permettant
 d'utiliser vraiment plusieurs machines du réseau, au lieu d'utiliser le
 réseau local de notre ordinateur.
+
+Nous avons cherché à faire une implémentation vraiment complète à ce niveau
+là: au départ plusieurs machines sont en attente d'ordres et uen machine
+commence le programme. Chaque \verb!doco! fait appel à des machines en
+attentes pour réaliser les taches, puis met la machine ayant fait le
+\verb!doco! en attente elle-même. Les machines ayant reçu un ordre font un
+fork pour avoir une instance du programme qui attend des ordres et une
+autre qui exécute, ce qui fait que toutes les machines sont susceptibles à
+tout moment de recevoir des ordres. 
+
+Nous avons rencontré un certain nombre de problèmes dont le plus gros étant Marshal qui ne
+supportait pas les types abstraits (que l'on utilisait pour définir les
+connections ouvertes). 
+
+
+
 \subsection{Implémentation Sequential}
 Notre première approche a été de considerer qu'un processus pouvait soit
 terminer, soit rendre la main sans avoir terminé. Dans cette
