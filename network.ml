@@ -19,7 +19,7 @@ let retransmit in_file_descr out_file_descr : 'a =
     while (true) do
         let v = (from_channel in_chan : 'a) in
         to_channel out_chan (v : 'a) [Closures];
-        flush out_chan;
+        flush out_chan
     done;
     (from_channel in_chan : 'a)
 
@@ -37,6 +37,7 @@ let find_computers () =
 
 let choose_computers n =
     let computers = find_computers () in
+    List.iter (fun s -> printf "%s@." s) computers;
     let rec choose n computers =
         match n with
         | 0 -> []
@@ -100,6 +101,7 @@ let put (v : 'a) p () =
         begin
         to_channel p.chan (v : 'a) [Closures];
         flush p.chan
+	end
     else
         let (in_file_descr, out_file_descr) = pipe () in
         (** TODO: Changer en double fork pour les performances **)
