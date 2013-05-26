@@ -1,8 +1,12 @@
+open Format
+open Sys
 open Unix
+
 
 (* Constant *******************************************************************)
 
 let trace_enable = false
+let pid_list = ref []
 
 
 (* Trace function *************************************************************)
@@ -14,7 +18,7 @@ let trace =
         then
             begin
             incr i;
-            Format.printf "// l: %d  pid: %d  f: %s@." !i (getpid ()) s
+            printf "// l: %d  pid: %d  f: %s@." !i (getpid ()) s
             end
         else ()
 
@@ -28,3 +32,21 @@ let try_finally f x finally y =
     in
     finally y;
     result
+
+let relay_signal signal pid =
+    let handler status =
+        kill pid signal;
+        printf "Pid to kill: %d@." pid;
+        kill (getpid ()) signal;
+        exit status
+    in
+    set_signal signal (Signal_handle handler)
+
+
+let killall _ =
+    List.iter (fun s -> Format.printf "##### %d @." s) !pid_list;
+    List.iter (fun pid -> kill pid sigkill) !pid_list;
+    exit 2
+
+let mem_for_killall pid =
+    pid_list := pid :: !pid_list

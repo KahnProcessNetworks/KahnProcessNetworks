@@ -1,5 +1,4 @@
 open Kahn
-open Implementation
 
 
 module Lib (K : S) =
@@ -31,6 +30,6 @@ struct
         (delay K.new_channel ()) >>= (fun (q_in, q_out) -> K.doco [ integers q_out ; output q_in ; ])
 end
  
-module Exp = Example(S) 
+module Exp = Example(Socket) 
 
-let () = S.run(Exp.main ())
+let () = Socket.run(Exp.main ())

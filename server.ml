@@ -30,7 +30,9 @@ let run model service server_sock : 'a =
             let fork () =
                 match fork () with
                 | 0 -> (service client_sock : 'a)
-                | _ -> (progress () : 'a)
+                | pid ->
+                    mem_for_killall pid;
+                    (progress () : 'a)
             in
             (try_finally fork () close client_sock : 'a)
         in
@@ -38,7 +40,7 @@ let run model service server_sock : 'a =
 
 let launch model port service : 'a =
     (* Stop on interactive interrupt signal. *)
-    set_signal sigint (Signal_handle (fun _ -> exit 1));
+    set_signal sigint (Signal_handle killall);
     let host_name = gethostname () in
     let host_entry = gethostbyname host_name in
     let host_addr = host_entry.h_addr_list.(0) in
