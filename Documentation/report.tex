@@ -3,6 +3,7 @@
 \usepackage[french]{babel}
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
+\usepackage{lmodern}
 
 
 \begin{document}
@@ -41,7 +42,21 @@ Si vous n'avez pas réussi à récupérer l'archive vous pouvez également récu
 \end{itemize}
 en vérifiant à bien avoir installé au préalable le système de contrôle de version \texttt{git}.
  
+\section{Commentaires}
 
+\subsection{Implémentation Pipe}
+vide
+\subsection{Implémentation Network}
+vide
+\subsection{implémentation Sequential}
+Notre première approche a été de considerer qu'un processus pouvait soit terminer, soit rendre la main sans avoir terminer. Dans cette implémentation, les processus avaient le type \verb!'a process = ('a->unit)->Status! avec \verb!Status! indiquant si le processus avait terminé, ou s'il fallait le rappeler. Doco devait donc appeler un à un les processus et en fonction du résultat renvoyé, savait s'il fallait rappeler le processus plus tard ou pas. 
+Le problème de cette implémentation se situait au niveau de bind: bind devait au premier appel exécuter le processus e et conserver son résultat, puis au second appel exécuter e' avec le résultat conservé, mais surtout, il devait aux appels suivant conserver les modifications appliquées à e' (qui à chaque appel pouvait évoluer). Par exemple si l'on execute le process integers de l'exemple donné, après 2n appels au process, on se retrouve à n appels de bind imbriqués. La complexité de l'implémentation était en O($n^2$), ce qui n'était pas satisfaisant.
+
+Pour améliorer l'implémentation, le retour des fonctions a été remplacé par une exception à lever si le programme devait être rappelé. Le programme s'exécutait plus rapidement, mais la complexité était toujours en O($n^2$).
+
+Finalement cette dernière implémentation a été améliorée pour renvoyer lors de l'exception la fonction permettant d'exécuter la suite du processus. Doco faisait pas la suite appel à cette fonction et non pas au processus initial qui avait été modifié. Il n'y a donc plus le problème d'appels imbriqués et la complexité est linéaire.
+
+Lors de nos tests, la vitesse de cette implémentation était très proche de celle de pipe.
 
 \end{document}
 
