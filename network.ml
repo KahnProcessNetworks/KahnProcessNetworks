@@ -12,17 +12,14 @@ let doco_father = ref ""
 
 (* Auxilliar functions ********************************************************)
 
-let retransmit in_file_descr out_file_descr =
-    let buffer_size = 4096 in
-    let buffer = String.create buffer_size in
-    let rec copy() =
-        match read in_file_descr buffer 0 buffer_size with
-        | 0 -> ()
-        | n ->
-            ignore (write out_file_descr buffer 0 n);
-            copy ()
-    in
-    copy ()
+let retransmit in_file_descr out_file_descr : 'a =
+    let in_chan = in_channel_of_descr in_file_descr in
+    let out_chan = out_channel_of_descr out_file_descr in
+    while (true) do
+        let v = (from_channel in_chan : 'a) in
+        to_channel out_chan (v : 'a) [Closures]
+    done;
+    (from_channel in_chan : 'a)
 
 let find_computers () =
     let computers = ref [] in
@@ -105,16 +102,16 @@ let put (v : 'a) p () =
             (* Establish a relay *)
             close out_file_descr;
             let host = gethostbyname !doco_father in
-            let addr = ADDR_INET (host.h_addr.list.(0), 1401) in
+            let addr = ADDR_INET (host.h_addr_list.(0), 1401) in
             let sock = socket PF_INET SOCK_STREAM 0 in
             connect sock addr;
             retransmit in_file_descr sock
         | _ ->
             (* Continue with put to relay *)
             close in_file_descr;
-            p.chan <- out_channel_of_descr out_file_descr
-            p.is_active <- true
-    
+            p.chan <- out_channel_of_descr out_file_descr;
+            p.is_active <- true;
+            to_channel p.chan (v : 'a) [Closures]
 
 let rec get p () : 'a =
     if (p.is_active)
@@ -127,21 +124,22 @@ let rec get p () : 'a =
             (* Establish a relay *)
             close in_file_descr;
             let host = gethostbyname !doco_father in
-            let addr = ADDR_INET (host.h_addr.list.(0), 1401) in
+            let addr = ADDR_INET (host.h_addr_list.(0), 1401) in
             let sock = socket PF_INET SOCK_STREAM 0 in
             connect sock addr;
-            retransmit sock out_file_descr
+            (retransmit sock out_file_descr : 'a)
         | _ ->
             (* Continue with put to relay *)
             close out_file_descr;
-            p.chan <- in_channel_of_descr in_file_descr
-            p.is_active <- true
+            p.chan <- in_channel_of_descr in_file_descr;
+            p.is_active <- true;
+            ((from_channel p.chan) : 'a)
 
 let distribute l =
     (* Select computers over the network *)
     let n = List.length l in
     let computers = choose_computers n in
-    let l = List.combine l computers in
+    let _ = List.combine l computers in
     match fork () with
     | 0 ->
         (* Launch the service information about channels *)
