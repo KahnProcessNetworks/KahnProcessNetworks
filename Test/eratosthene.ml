@@ -1,5 +1,4 @@
 open Kahn
-open Implementation
 
 
 module Lib (K : S) =
