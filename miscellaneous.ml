@@ -45,7 +45,6 @@ let relay_signal signal pid =
 
 
 let killall _ =
-    List.iter (fun s -> Format.printf "##### %d @." s) !pid_list;
     List.iter (fun pid -> kill pid sigkill) !pid_list;
     exit 2
 
@@ -98,7 +97,7 @@ let choose_computers config_file n =
                 let p _ = Random.bool () in
                 let (l1, l2) = List.partition p computers in
                 let computers = l1 @ l2 in
-                let l3 = choose (n - 1) (List.tl computers) in
+                let l3 = choose (n - 1) computers in
                 match computers with
                 | [] -> failwith "empty network 2"
                 | computer :: tl ->

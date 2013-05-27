@@ -14,6 +14,7 @@ sig
 end
 
 
+module Th     : S = Threads
 module Pipe   : S = Pipe
 module Socket : S = Network
 module Seq    : S = Sequential
