@@ -16,55 +16,130 @@
 
 \section{Installation}
 
-Une fois l'archive \texttt{davy-lefebvre.tgz} récupérée et les fichiers extraits placez-vous dans le répertoire \texttt{davy-lefebvre}. Dans ce répertoire la commande :
+Une fois l'archive \verb!davy-lefebvre.tgz! récupérée et les fichiers extraits placez-vous dans le répertoire \verb!davy-lefebvre!. Dans ce répertoire la commande :
 \begin{itemize}
-	\item \texttt{make} : compile notre programme
+	\item \verb!make! : compile notre programme
 \end{itemize}
 Pour la désinstallation la commande :
 \begin{itemize}
-	\item \texttt{make clean} : efface tous les fichier qu'une des commandes précédentes a pu engendrer et ne laisse dans le répertoire que les fichiers sources
+	\item \verb!make clean! : efface tous les fichier que la commande précédente a pu engendrer et ne laisse dans le répertoire que les fichiers sources
 \end{itemize}
 Si vous n'avez pas réussi à récupérer l'archive vous pouvez également récupérer le code source à l'aide de la commande
 \begin{itemize}
-	\item \texttt{git clone https://github.com/KahnProcessNetworks/KahnProcessNetworks}
+	\item \verb!git clone https://github.com/KahnProcessNetworks/KahnProcessNetworks!
 \end{itemize}
-en vérifiant à bien avoir installé au préalable le système de contrôle de version \texttt{git}.
- 
+en vérifiant à bien avoir installé au préalable le système de contrôle de version \verb!git!.
+\newline
+Le dossier Trash contient quelques fichiers correspondant aux premières
+implémentations que l'on avait réalisé pour le réseau et la simulation séquentiel. 
+\newline
+Le dossier Test contient quelques fichiers tests. Par défaut la commande
+\verb!make! compile le programme dont le code source est contenu dans le
+fichier \verb!test.ml!.
+\newline
+Comme demandé, le fichier \verb!kahn.ml! contient les modules
+\verb!Th!, \verb!Pipe!, \verb!Socket!, \verb!Sequential! et
+\verb!Best!.
+\newline
+L'utilisation de l'implémentation \verb!Socket! nécessite une procédure
+particulière pour lancer votre programme après l'avoir compilé (cf. partie
+2.2 Implémentation Network).
+
 \section{Commentaires}
 
 \subsection{Implémentation Pipe}
-Pas de commentaires particuliers
+Pas de commentaires particuliers.
 
 \subsection{Implémentation Network}
 La toute première implémentation de Network que l'on a réalisé était assez
-peu performante: On avait considéré que les put et les get étaient des
+peu performante: on avait considéré que les \verb!put! et les \verb!get! étaient des
 requêtes à un serveur représentant le channel. Le problème de performance
 était au niveau de l'implémentation: chaque \verb!put! et \verb!get! utilisait
-\verb!connect! pour se connecter au serveur, puis une fois le put et get
-terminé, on fermais le socket. Des problèmes sont apparus dûs au fait que l'on réalisait
+\verb!connect! pour se connecter au serveur, puis une fois le \verb!put! et \verb!get!
+terminé, on fermait le socket. Des problèmes sont apparus dûs au fait que l'on réalisait
 un grand nombre de connections par secondes. Les problèmes ont été résolus
 en paramétrant les options des sockets,
 mais l'implémentation était vraiment lente.
 
 Finalement au lieu d'améliorer cette implémentation en gardant les
 connections actives, et donc en évitant de refaire des connections à chaque
-put et get, nous sommes partis sur un tout autre concept permettant
+\verb!put! et \verb!get!, nous sommes parti sur un tout autre concept permettant
 d'utiliser vraiment plusieurs machines du réseau, au lieu d'utiliser le
 réseau local de notre ordinateur.
 
-Nous avons cherché à faire une implémentation vraiment complète à ce niveau
-là: au départ plusieurs machines sont en attente d'ordres et uen machine
+Nous avons cherché à faire une implémentation vraiment complète à ce
+niveau: au départ plusieurs machines sont en attente d'ordres et une machine
 commence le programme. Chaque \verb!doco! fait appel à des machines en
-attentes pour réaliser les taches, puis met la machine ayant fait le
+attentes pour réaliser les taches et parallèlement met la machine ayant fait le
 \verb!doco! en attente elle-même. Les machines ayant reçu un ordre font un
 fork pour avoir une instance du programme qui attend des ordres et une
 autre qui exécute, ce qui fait que toutes les machines sont susceptibles à
-tout moment de recevoir des ordres. 
+tout moment de recevoir des ordres.
 
-Nous avons rencontré un certain nombre de problèmes dont le plus gros étant Marshal qui ne
-supportait pas les types abstraits (que l'on utilisait pour définir les
-connections ouvertes). 
+De manière plus détaillée, pour lancer le programme toutes les machines
+sauf une exécute le programme avec l'option \verb!-wait!. L'autre machine
+en question, que l'on nommera mère, commence l'exécution.
+Chaque machine possède en local un fichier de configuration
+\verb!network.config! qui contient l'ensemble des machines auxquelles elle
+est susceptible de demander l'exécution d'un processus. De plus la machine
+mère posséde un fichier de configuration \verb!host.config! qui contient
+son hostname complet (DNS).
 
+La machine mère commence par un fork qui lui permet d'établir un serveur
+disponible pour de futures demandes d'exécutions de processus de la part du
+réseau. De l'autre côté elle exécute le processus séquentiellement jusqu'à
+atteindre le premier \verb!doco!.
+Ce qui suit est désormais également valable pour toute machine du réseau
+qui aura à traiter un \verb!doco!.
+Il faut à la fois distribuer les processus à travers le réseau et établir
+les connections entre ces processus. La distribution est facile et chaque
+processus se retrouve associés à une machine. Les channels lorqu'ils sont
+créés sont identifiés de manière symbolique: ce sera uniquement lors d'un
+appel à \verb!get! ou \verb!put! que la connection se fera réellement.
+Pour établir cette connection l'identification des machines aux extrémités
+est nécessaire, elle se fera par une requête à la machine ayant lancé le
+\verb!doco!. Cette machine doit donc prévoir un serveur pour ce service.
+Pour résumer, un \verb!doco! en parallèle lance ce serveur et envoit les
+processus à travers le réseau puis attend leurs terminaisons.
+Afin de rendre indépendants les \verb!get! et les \verb!put! des aléas du
+réseau et des appels bloquants, un processus relais est créé pour accumuler
+les paquets et les redistribuer à la demande.
+
+
+Nous avons rencontré un certain nombre de problèmes pour cette
+implémentation dont le plus gros était
+l'utilisation du module Marshal qui ne supportait pas les types abstraits
+(que l'on utilisait pour définir les connections ouvertes).
+Un autre problème a été celui de la gestion des signaux d'interruption.
+Après avoir essayé de faire des retours sur pannes, nous avons finalement
+opté pour une simple accumulation des identifiants des processus pour tous
+les tuer en cas de besoins.
+En ce qui concerne le débugage nous n'avons pas réussi à trouver d'autre
+moyen que d'effectuer des rapports de logs sur les différentes machines.
+Pour finir les serveurs utilisent un fork pour pouvoir servir un client tout
+en restant disponible à tout connexion entrante. L'utilisation de double
+fork serait une optimisation possible.
+\\
+\emph{guide d'utilisation:}
+\begin{itemize}
+\item Spécifiez l'utilisation du module \verb!Socket! dans \verb!test.ml!
+\item Compilez avec \verb!make!
+\item{Copiez l'exécutable sur un ensemble de machines qui constituent le
+  réseau}
+\item{Configurez les fichiers \verb!network.config! pour chaque
+    machine, chaque ligne doit correspondre à un host potentiel}
+\item{Configurez le fichier \verb!host.config! pour la machine mère
+    uniquement en y mettant son DNS}
+\item{Lancez le programme avec l'option \verb!-wait! sur toutes les
+    machines sauf la machine mère}
+\item{Lancez le programme sur la machine mère}
+\end{itemize}
+\emph{Remarque importante:}
+\begin{itemize}
+\item{Il faut veiller à ce que toute machine mentionnée dans un
+  \verb!network.config! exécute le programme avec l'option \verb!-wait!
+  afin de pouvoir recevoir et exécuter un processus}
+\end{itemize}
 
 
 \subsection{Implémentation Sequential}
